@@ -15,10 +15,12 @@ RUN sudo apt-get install -y libosmesa6-dev libgl1-mesa-glx libglfw3 libglew-dev
 RUN sudo apt install patchelf=0.9-1
 
 
-# Install mujoco
+# Install mujoco_py
 RUN pip install -U 'mujoco-py<2.2,>=2.1'
 RUN python -c "import mujoco_py"
 
 
 # Install further packages
+RUN pip install --user pygame==2.1.2
+RUN pip install --user gym[mujoco,robotics]==0.23.1
 RUN apt-get install -y  python3-tk 	# Used for matplotlib to display plots on host machine
