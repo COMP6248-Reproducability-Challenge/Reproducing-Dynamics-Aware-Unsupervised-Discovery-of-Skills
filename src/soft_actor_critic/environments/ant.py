@@ -1,20 +1,20 @@
 import gym
 from .environment import Environment
 
-class Pendulum(Environment):
+class Ant(Environment):
     def __init__(self):
         super().__init__()
-        self.env = gym.make('Pendulum-v1')
+        self.env = gym.make('Ant-v3')
         self.observation_space = self.env.observation_space
         self.action_space = self.env.action_space
 
     def take_action(self, action):
-        obs, reward, done, _ = self.env.step([action.item()])
-        self.observation = obs
+        obs, reward, done, _ = self.env.step(action)
+        self.observation = list(obs)
         self.reward = reward
         self.done = done
         self.frames += 1
-        if self.done and self.frames < 200:
+        if self.done and self.frames > 1000:
             self.won = True
         else:
             self.won = False

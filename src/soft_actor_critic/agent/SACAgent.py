@@ -65,7 +65,7 @@ class SACAgent:
         return actions
 
     def rescale_action(self, action):
-        return action.item() * self.action_scale
+        return action * self.action_scale
 
     def train_models(self, verbose):
         if len(self.memory.observation) < self.batch_size:
@@ -126,14 +126,14 @@ class SACAgent:
         self.env.reset_env()
         total_reward = 0
         while not self.env.done:
-            current_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device)
+            current_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device).type(torch.float)
             current_action = self.choose_action(current_obs)
             if display_gameplay:
                 self.env.env.render()
 
-            self.env.take_action([current_action])
+            self.env.take_action(current_action.squeeze().cpu().numpy())
             total_reward += self.env.reward
-            next_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device)
+            next_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device).type(torch.float)
             done = self.env.done
 
             self.train_models(verbose=False)
@@ -152,7 +152,7 @@ class SACAgent:
                                                                                              self.winstreak,
                                                                                              self.total_wins))
             # Now store the experience for later use in training
-            current_action = torch.tensor([[current_action]], dtype=torch.float).to(self.device)
+            # current_action = torch.tensor(current_action, dtype=torch.float).to(self.device)
             reward = torch.tensor([[self.env.reward]], dtype=torch.float).to(self.device)
             done = torch.tensor([[done]], dtype=torch.int).to(self.device)
             self.memory.append("observation", current_obs)
