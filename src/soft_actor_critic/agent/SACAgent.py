@@ -1,14 +1,13 @@
 import torch
 import torch.nn.functional as funcs
-from .Actor import Actor
-from .Critic import Critic
-from .Memory import Memory
+from src.soft_actor_critic.agent.Actor import Actor
+from src.soft_actor_critic.agent.Critic import Critic
+from src.soft_actor_critic.agent.Memory import Memory
 
 
 class SACAgent:
-    def __init__(self, env, device, num_hidden_neurons=256, writer=None,
-                 learning_rate=0.0003, discount_rate=0.99, memory_length=1000000, batch_size=256, polyak=0.995,
-                 alpha=0.2, policy_train_delay_modulus=2):
+    def __init__(self, env, device, num_hidden_neurons=256, writer=None, learning_rate=0.0003, discount_rate=0.99,
+                 memory_length=1000000, batch_size=256, polyak=0.995, alpha=0.2, policy_train_delay_modulus=2):
         self.device = device
         self.learning_rate = learning_rate
         self.env = env

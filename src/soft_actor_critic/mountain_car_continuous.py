@@ -1,9 +1,4 @@
 import torch
-import sys
-
-sys.path.append(r'/opt/project/dads_replication/src')
-sys.path.append(r'/opt/project/dads_replication/src/agent/')
-
 from agent.SACAgent import SACAgent
 from environments.mountaincar_cont import MountainCarContinuous
 

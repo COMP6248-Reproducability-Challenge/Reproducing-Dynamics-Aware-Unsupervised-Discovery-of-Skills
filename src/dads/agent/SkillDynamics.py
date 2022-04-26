@@ -5,8 +5,8 @@ from torch import optim
 
 
 class SkillDynamics(nn.Module):
-    def __init__(self, learning_rate, input_shape, device, writer, num_hidden_neurons):
-        super(SkillDynamics).__init__()
+    def __init__(self, input_shape, device, writer=None, num_hidden_neurons = 256, learning_rate=3e-4):
+        super(SkillDynamics, self).__init__()
         self.learning_rate = learning_rate
         self.input_shape = input_shape
         self.device = device
@@ -22,10 +22,9 @@ class SkillDynamics(nn.Module):
         self.expert2_mu = nn.Linear(self.num_hidden_neurons, input_shape)
         self.expert3_mu = nn.Linear(self.num_hidden_neurons, input_shape)
         self.expert4_mu = nn.Linear(self.num_hidden_neurons, input_shape)
-        # TODO: This softmax bit may be wrong, it's half guesswork. A softmax layer is used as part of gating model to
-        #  decide when to use which expert. I'm choosing to implement this as another Linear layer but we should
-        #  confirm this is the same as in the paper.
-        # The softmax acts to choose which expert to use, there's 4 hardcoded experts:
+        # A softmax layer is used as part of gating model to decide when to use which expert. This is currently
+        # implemented a Linear layer, but we should confirm this is the same as in the paper.
+        # The softmax acts to choose which expert to use, there's 4 hardcoded experts, so 4 output neurons:
         self.softmax_input = nn.Linear(self.num_hidden_neurons, 4)
         # All experts use an identity matrix as the standard deviation.
         self.sigma = torch.eye(self.input_shape)
@@ -50,13 +49,14 @@ class SkillDynamics(nn.Module):
         normalisation"
 
         :param observation: The current state s
-        :return: The four expert's means plus the softmax layer output
+        :return: The four expert's means plus the softmax layer's output, which is the choice of expert
         """
 
         out = self.fc1(observation, dim=1)
         out = funcs.relu(out)
         out = self.fc2(out)
         out = funcs.relu(out)
+        # TODO: replace this implementation with the MixtureSameFamily class in PyTorch.
         mu1 = self.expert1_mu(out)
         mu2 = self.expert2_mu(out)
         mu3 = self.expert3_mu(out)
@@ -64,6 +64,32 @@ class SkillDynamics(nn.Module):
         softmax_gate = funcs.softmax(self.softmax_input(out))
         return mu1, mu2, mu3, mu4, softmax_gate
 
-    def predict_next_state(self, mu1, mu2, mu3, mu4, softmax_gate):
-        pass
+    def sample_next_state(self, mu1, mu2, mu3, mu4, softmax_gate):
+        """
+        Returns a prediction of the next state when provided the mixture-of-experts' predictions.
 
+        :param mu1: The predicted mean of the next state distribution from expert 1
+        :param mu2: The predicted mean of the next state distribution from expert 2
+        :param mu3: The predicted mean of the next state distribution from expert 3
+        :param mu4: The predicted mean of the next state distribution from expert 4
+        :param softmax_gate: The output from the softmax gating model used to stochastically choose which expert to use
+        :return: The next state, sampled from the stochastically chosen expert for this state.
+        """
+        mus = [mu1, mu2, mu3, mu4]
+        # We stochastically decide which mu to use based on the softmax_gate's as probabilities:
+        chosen_expert = torch.multinomial(softmax_gate, 1)
+        expert_mu = mus[chosen_expert]
+        next_state = torch.normal(expert_mu, self.sigma)
+        return next_state
+
+    def train_model(self, previous_obs, current_obs):
+        # TODO: Assuming that memory is sampled and passed in, we
+        #  then need to use batch normalisation while we're training, both for the input and the hidden layers as well.
+        # Remember: The dynamics model predicts the delta from the current state to the next
+        predicted_observation_delta = self.forward(previous_obs)
+        actual_observation_delta = current_obs - previous_obs
+
+        self.optimizer.zero_grad()
+        loss = torch.nn.MSELoss(predicted_observation_delta, actual_observation_delta)
+        loss.backward()
+        self.optimizer.step()
