@@ -9,7 +9,7 @@ class MountainCarContinuous(Environment):
         self.action_space = self.env.action_space
 
     def take_action(self, action):
-        obs, reward, done, _ = self.env.step(action)
+        obs, reward, done, _ = self.env.step([action.item()])
         self.observation = obs
         self.reward = reward
         self.done = done

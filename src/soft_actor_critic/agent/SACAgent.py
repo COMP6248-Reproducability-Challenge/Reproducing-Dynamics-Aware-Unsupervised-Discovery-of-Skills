@@ -6,12 +6,13 @@ from src.soft_actor_critic.agent.Memory import Memory
 
 
 class SACAgent:
-    def __init__(self, env, device, num_hidden_neurons=256, writer=None, learning_rate=0.0003, discount_rate=0.99,
-                 memory_length=1000000, batch_size=256, polyak=0.995, alpha=0.2, policy_train_delay_modulus=2):
+    def __init__(self, env, device, num_hidden_neurons=256, writer=None, learning_rate=3e-4, discount_rate=0.99,
+                 memory_length=1000000, batch_size=256, polyak=0.995, alpha=0.1, policy_train_delay_modulus=2,
+                 input_shape=None):
         self.device = device
         self.learning_rate = learning_rate
         self.env = env
-        self.input_shape = self.env.observation_space.shape[0]
+        self.input_shape = self.env.observation_space.shape[0] if input_shape is None else input_shape
         self.output_shape = self.env.action_space.shape[0]
         self.action_scale = torch.FloatTensor(
                 (self.env.action_space.high - self.env.action_space.low) / 2.).to(self.device)

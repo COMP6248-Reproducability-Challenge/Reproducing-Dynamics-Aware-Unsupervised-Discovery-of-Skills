@@ -29,10 +29,3 @@ class Memory:
         rewards = self.reward[sample_index]
         done = self.done[sample_index]
         return obs, next_obs, actions, rewards, done
-
-    def wipe(self):
-        self.observation = torch.tensor([]).to(self.device)
-        self.next_observation = torch.tensor([]).to(self.device)
-        self.action = torch.tensor([]).to(self.device)
-        self.reward = torch.tensor([]).to(self.device)
-        self.done = torch.tensor([]).to(self.device)
