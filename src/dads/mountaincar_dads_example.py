@@ -5,10 +5,10 @@ from src.soft_actor_critic.environments.mountaincar_cont import MountainCarConti
 env = MountainCarContinuous()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-agent = DADSAgent(env=env, device=device, n_skills=4)
+agent = DADSAgent(env=env, device=device, n_skills=4, learning_rate=0.01)
 
 t = 0
-while agent.winstreak < 10 and t < 25:
+while agent.winstreak < 10 and t < 5:
     t += 1
     agent.play_games(1, verbose=True)
 
