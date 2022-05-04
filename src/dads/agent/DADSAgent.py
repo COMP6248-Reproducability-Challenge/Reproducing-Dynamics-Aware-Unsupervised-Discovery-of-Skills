@@ -24,6 +24,21 @@ class DADSAgent(SACAgent):
         # Overwrite the memory that the SACAgent instantiates with a new memory that additionally stores the skills:
         self.memory = SkillDynamicsMemory(memory_length=self.memory_length, device=self.device)
 
+    def save_models(self):
+        torch.save(self.skill_dynamics, "skill_dynamics")
+        torch.save(self.actor, "actor")
+        torch.save(self.critic1, "critic1")
+        torch.save(self.critic2, "critic2")
+        torch.save(self.critic_target1, "critic_target1")
+        torch.save(self.critic_target2, "critic_target2")
+
+    def load_models(self):
+        self.skill_dynamics = torch.load("skill_dynamics")
+        self.actor = torch.load("actor")
+        self.critic1 = torch.load("critic1")
+        self.critic2 = torch.load("critic2")
+        self.critic_target1 = torch.load("critic_target1")
+        self.critic_target2 = torch.load("critic_target2")
 
     def _sample_skill(self, skill):
         if skill is None:
