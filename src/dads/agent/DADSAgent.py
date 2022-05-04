@@ -7,7 +7,7 @@ from src.dads.agent.SkillDynamicsMemory import SkillDynamicsMemory
 
 
 class DADSAgent(SACAgent):
-    def __init__(self, env, device, n_skills, learning_rate=3e-4, memory_length=1e5, batch_size=128, num_hidden_neurons=256):
+    def __init__(self, env, device, n_skills, learning_rate=3e-4, memory_length=1e5, batch_size=32, num_hidden_neurons=256):
         self.n_skills = n_skills
         self.active_skill = None
         env_state_length = env.observation_space.shape[0]
@@ -52,15 +52,15 @@ class DADSAgent(SACAgent):
         while not self.env.done or env_timesteps < 250:
             env_timesteps +=1
             # Take the observation from the environment, format it, push it to GPU
-            current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device).reshape((1, -1))
+            current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device, requires_grad=False).reshape((1, -1))
             current_obs_skill = torch.cat((current_obs, self.active_skill), 1)
             current_action = self.choose_action(current_obs_skill)
             if display_gameplay:
                 self.env.env.render()
             self.env.take_action(current_action.squeeze().cpu().numpy())
-            next_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device).reshape((1, -1))
-            done = torch.tensor([[self.env.done]], dtype=torch.int, device=self.device)
-            reward = torch.tensor([[self.env.reward]], dtype=torch.int, device=self.device)
+            next_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device, requires_grad=False).reshape((1, -1))
+            done = torch.tensor([[self.env.done]], dtype=torch.int, device=self.device, requires_grad=False)
+            reward = torch.tensor([[self.env.reward]], dtype=torch.int, device=self.device, requires_grad=False)
             # This is the original SACAgent's method, now over-ridden below to also train the skill dynamics model
             self.memory.append("skills", self.active_skill)
             self.memory.append("observation", current_obs)
@@ -101,11 +101,11 @@ class DADSAgent(SACAgent):
             q1_loss = funcs.mse_loss(curr_q1, next_q.detach())
             q2_loss = funcs.mse_loss(curr_q2, next_q.detach())
 
-            self.critic1.optimizer.zero_grad()
+            self.critic1.optimizer.zero_grad(set_to_none=True)
             q1_loss.backward()
             self.critic1.optimizer.step()
 
-            self.critic2.optimizer.zero_grad()
+            self.critic2.optimizer.zero_grad(set_to_none=True)
             q2_loss.backward()
             self.critic2.optimizer.step()
             if verbose:
@@ -118,7 +118,7 @@ class DADSAgent(SACAgent):
                 curr_min_q_policy = torch.min(curr_q1_policy, curr_q2_policy)
                 policy_loss = torch.mean(self.alpha * curr_log_probs - curr_min_q_policy)
 
-                self.actor.optimizer.zero_grad()
+                self.actor.optimizer.zero_grad(set_to_none=True)
                 policy_loss.backward()
                 self.actor.optimizer.step()
                 if verbose:
@@ -126,6 +126,8 @@ class DADSAgent(SACAgent):
 
                 self.polyak_soft_update(target=self.critic_target1, source=self.critic1)
                 self.polyak_soft_update(target=self.critic_target2, source=self.critic2)
+                del policy_loss, curr_min_q_policy, curr_q2_policy, curr_q1_policy
+
 
     def calc_intrinsic_rewards(self, skills, states, new_states):
         batch_length = states.shape[0]
@@ -146,5 +148,7 @@ class DADSAgent(SACAgent):
             # Fix for dividing by zero - if the denominator is zero, the numerator has to be, so just set the denom to be 1 instead:
             summed_other_skill_probs[summed_other_skill_probs == 0] = 1
             intrinsic_reward = torch.log(this_skill_probs / summed_other_skill_probs.view(-1)) + torch.log(torch.tensor([batch_length], dtype=torch.float, device=self.device))
-            intrinsic_reward = torch.clip(intrinsic_reward, min=-50, max=50)
+            intrinsic_reward = torch.clamp(intrinsic_reward, min=-50, max=50)
+            del states_and_skills, states_and_other_skills, summed_other_skill_probs, this_skill_probs,\
+                this_skill_distribution,
         return intrinsic_reward

@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as funcs
 from torch.distributions.multivariate_normal import MultivariateNormal
+from torch.distributions.normal import Normal
 from torch.distributions.categorical import Categorical
 from torch.distributions.independent import Independent
 from torch.distributions.mixture_same_family import MixtureSameFamily
@@ -19,7 +20,8 @@ class SkillDynamics(nn.Module):
         self.num_hidden_neurons = num_hidden_neurons  # Paper uses same number across layers and networks
         self.learning_rate = learning_rate
         # The first layer takes the state input plus a one-hot encoding of which skill is active
-        self.batchnorm = nn.BatchNorm1d(num_features=self.num_hidden_neurons)
+        self.batchnorm1 = nn.BatchNorm1d(num_features=self.num_hidden_neurons)
+        self.batchnorm2 = nn.BatchNorm1d(num_features=self.num_hidden_neurons)
         self.fc1 = nn.Linear(self.input_shape, self.num_hidden_neurons)
         self.fc2 = nn.Linear(self.num_hidden_neurons, self.num_hidden_neurons)
         # Each expert is a multinomial gaussian, with the same dimension as the input state space
@@ -39,10 +41,10 @@ class SkillDynamics(nn.Module):
 
     def forward(self, observation_and_skill):
         out = self.fc1(observation_and_skill)
-        out = self.batchnorm(out)
+        out = self.batchnorm1(out)
         out = funcs.relu(out)
         out = self.fc2(out)
-        out = self.batchnorm(out)
+        out = self.batchnorm2(out)
         out = funcs.relu(out)
         mu1 = self.expert1_mu(out)
         mu2 = self.expert2_mu(out)
@@ -76,7 +78,7 @@ class SkillDynamics(nn.Module):
 
     def train_model(self, previous_obs_and_skill, current_obs_and_skill, verbose=False):
         # Remember: The dynamics model predicts the delta from the current state to the next
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad(set_to_none=True)
         next_state, delta, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
         # We index after this difference as we only want  delta of the state and not the space-skill concatenation
         actual_delta = (current_obs_and_skill - previous_obs_and_skill)[:, 0:self.env_shape]

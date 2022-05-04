@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from src.soft_actor_critic.agent.Memory import Memory
 
 class SkillDynamicsMemory(Memory):
@@ -20,4 +19,4 @@ class SkillDynamicsMemory(Memory):
 
     def wipe(self):
         super(SkillDynamicsMemory, self).__init__(memory_length=self.memory_length, device=self.device)
-        self.skills = torch.tensor([], dtype=torch.int, device=self.device)
+        self.skills = torch.tensor([], dtype=torch.int, device=self.device, requires_grad=False)

@@ -1,16 +1,15 @@
 import torch
-import numpy as np
-
+from random import choices
 
 class Memory:
     def __init__(self, memory_length, device):
         self.memory_length = memory_length
         self.device = device
-        self.observation = torch.tensor([]).to(self.device)
-        self.next_observation = torch.tensor([]).to(self.device)
-        self.action = torch.tensor([]).to(self.device)
-        self.reward = torch.tensor([], dtype=torch.int).to(self.device)
-        self.done = torch.tensor([], dtype=torch.bool).to(self.device)
+        self.observation = torch.tensor([], device=self.device, requires_grad=False)
+        self.next_observation = torch.tensor([], device=self.device, requires_grad=False)
+        self.action = torch.tensor([], device=self.device, requires_grad=False)
+        self.reward = torch.tensor([], dtype=torch.int, device=self.device, requires_grad=False)
+        self.done = torch.tensor([], dtype=torch.bool, device=self.device, requires_grad=False)
 
     def append(self, mem_type, data):
         mem = getattr(self, mem_type)
@@ -22,7 +21,7 @@ class Memory:
 
     def sample_memory(self, sample_length):
         memory_size = len(self.observation)
-        sample_index = list(np.random.choice(range(memory_size), sample_length, replace=True))
+        sample_index = choices(range(memory_size), k=sample_length)
         obs = self.observation[sample_index]
         next_obs = self.next_observation[sample_index]
         actions = self.action[sample_index]

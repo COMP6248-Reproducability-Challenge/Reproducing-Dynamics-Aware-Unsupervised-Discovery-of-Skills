@@ -8,7 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 agent = DADSAgent(env=env, device=device, n_skills=4, learning_rate=0.01) # 3e-4
 
 t = 0
-while agent.winstreak < 10 and t < 75:
+while agent.winstreak < 10 and t < 250:
     t += 1
     agent.play_games(1, verbose=False)
 
