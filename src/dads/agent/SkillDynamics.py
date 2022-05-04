@@ -9,9 +9,11 @@ from torch import optim
 
 
 class SkillDynamics(nn.Module):
-    def __init__(self, input_shape, output_shape, device, num_hidden_neurons=256, learning_rate=3e-4):
+    def __init__(self, env_shape, skill_shape, output_shape, device, num_hidden_neurons=256, learning_rate=3e-4):
         super(SkillDynamics, self).__init__()
-        self.input_shape = input_shape  # This includes the skill encoder
+        self.env_shape = env_shape
+        self.skill_shape = skill_shape
+        self.input_shape = env_shape + skill_shape # This includes the skill encoder
         self.output_shape = output_shape  # This is just the size of the state space
         self.device = device
         self.num_hidden_neurons = num_hidden_neurons  # Paper uses same number across layers and networks
@@ -69,18 +71,18 @@ class SkillDynamics(nn.Module):
         else:
             delta = next_state_distribution.sample()
         # TODO: fix this to be general, as 0:2 only relates to the mountain car environment's dimension of 2
-        next_state = state_and_skill[:, 0:2] + delta # next_state = state_and_skill[:, 0:2] + delta
+        next_state = state_and_skill[:, 0:self.env_shape] + delta # next_state = state_and_skill[:, 0:2] + delta
         return next_state, delta, next_state_distribution
 
     def train_model(self, previous_obs_and_skill, current_obs_and_skill, verbose=False):
         # Remember: The dynamics model predicts the delta from the current state to the next
         self.optimizer.zero_grad()
-        _, _, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
-        # TODO: fix this indexing to be general, see TODO on line 71 above
+        next_state, delta, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
         # We index after this difference as we only want  delta of the state and not the space-skill concatenation
-        actual_delta = (current_obs_and_skill - previous_obs_and_skill)[:, 0:2]
-        # TODO: check whether the scaling performed on the targets below gives the correct values?
-        actual_delta_scaled = ((actual_delta - torch.mean(actual_delta, dim=0)) / torch.std(actual_delta, dim=0))
+        actual_delta = (current_obs_and_skill - previous_obs_and_skill)[:, 0:self.env_shape]
+        columnwise_stds = torch.std(actual_delta, dim=0)
+        columnwise_stds[columnwise_stds == 0] = 1
+        actual_delta_scaled = ((actual_delta - torch.mean(actual_delta, dim=0)) / columnwise_stds)
         loss = -1.0 * torch.mean(distribution.log_prob(actual_delta_scaled))
         loss.backward()
         if verbose:

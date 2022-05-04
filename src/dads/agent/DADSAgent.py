@@ -16,7 +16,7 @@ class DADSAgent(SACAgent):
                                         num_hidden_neurons=num_hidden_neurons, writer=None, learning_rate=learning_rate,
                                         discount_rate=0.99, memory_length=memory_length, batch_size=batch_size,
                                         polyak=0.995, alpha=0.1, policy_train_delay_modulus=2)
-        self.skill_dynamics = SkillDynamics(input_shape=input_shape_with_skill_encoder, output_shape=env_state_length,
+        self.skill_dynamics = SkillDynamics(env_shape=env_state_length, skill_shape=n_skills, output_shape=env_state_length,
                                             device=self.device, num_hidden_neurons=num_hidden_neurons,
                                             learning_rate=3e-4)
         self.batch_size = batch_size
@@ -48,7 +48,9 @@ class DADSAgent(SACAgent):
         self.memory.wipe()      # Start each episode with an empty memory
         self._sample_skill(skill)  # Updates self.active_skill tensor to be a newly sampled one hot encoding
         memorized_batch_size = 0
-        while not self.env.done:
+        env_timesteps = 0
+        while not self.env.done or env_timesteps < 250:
+            env_timesteps +=1
             # Take the observation from the environment, format it, push it to GPU
             current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device).reshape((1, -1))
             current_obs_skill = torch.cat((current_obs, self.active_skill), 1)
@@ -140,5 +142,9 @@ class DADSAgent(SACAgent):
                 _, _, other_skill_distribution = self.skill_dynamics.sample_next_state(states_and_other_skills)
                 other_skill_probs = torch.exp(other_skill_distribution.log_prob(new_states - states))
                 summed_other_skill_probs += other_skill_probs.reshape(-1, 1)
+
+            # Fix for dividing by zero - if the denominator is zero, the numerator has to be, so just set the denom to be 1 instead:
+            summed_other_skill_probs[summed_other_skill_probs == 0] = 1
             intrinsic_reward = torch.log(this_skill_probs / summed_other_skill_probs.view(-1)) + torch.log(torch.tensor([batch_length], dtype=torch.float, device=self.device))
+            intrinsic_reward = torch.clip(intrinsic_reward, min=-50, max=50)
         return intrinsic_reward
