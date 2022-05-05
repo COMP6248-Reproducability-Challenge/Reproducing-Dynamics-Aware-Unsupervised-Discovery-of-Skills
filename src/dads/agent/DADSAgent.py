@@ -70,7 +70,6 @@ class DADSAgent(SACAgent):
             current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device, requires_grad=False).reshape((1, -1))
             current_obs_skill = torch.cat((current_obs, self.active_skill), 1)
             current_action = self.choose_action(current_obs_skill)
-            print(current_action)
             if display_gameplay:
                 self.env.env.render()
             self.env.take_action(current_action.squeeze().cpu().numpy())
@@ -103,7 +102,6 @@ class DADSAgent(SACAgent):
 
         # For DADS, we calculate an intrinsic reward rather than using the rewards sampled from the memory (and blanked
         # out above):
-        # TODO: the rewards, as far as I can tell, are always equal; we need to investigate
         rewards = self.calc_intrinsic_rewards(skills=skills, states=states, new_states=new_states)
         for _ in range(128):
             next_actions, next_log_probs = self.actor.sample_normal(observation=new_states_and_skills, reparameterise=True)
@@ -153,16 +151,25 @@ class DADSAgent(SACAgent):
             _, _, this_skill_distribution = self.skill_dynamics.sample_next_state(states_and_skills)
             this_skill_log_probs = this_skill_distribution.log_prob(new_states - states)
 
-            summed_other_skill_log_probs = torch.zeros(size=(batch_length, 1), dtype=torch.float, device=self.device)
+            # We need the exponent of the log probs here
+            summed_other_skill_probs = torch.zeros(size=(batch_length, 1), dtype=torch.float, device=self.device)
             for i in range(self.n_skills):
                 other_skill = self._create_skill_encoded([i])
                 states_and_other_skills = torch.cat((states, other_skill.repeat((batch_length, 1))), 1)
                 _, _, other_skill_distribution = self.skill_dynamics.sample_next_state(states_and_other_skills)
-                other_skill_log_probs = other_skill_distribution.log_prob(new_states - states)
-                summed_other_skill_log_probs += other_skill_log_probs.reshape(-1, 1)
+                other_skill_probs = torch.exp(other_skill_distribution.log_prob(new_states - states))
+                summed_other_skill_probs += other_skill_probs.reshape(-1, 1)
 
+            intrinsic_reward = torch.log(torch.tensor([4.], dtype=torch.float, device=self.device)) +\
+                                torch.clamp(this_skill_log_probs.view(-1, 1) - torch.log(summed_other_skill_probs), -50, 50)
+            return intrinsic_reward
 
-            intrinsic_reward = this_skill_log_probs.view(-1, 1) - summed_other_skill_log_probs +\
-                               torch.log(torch.tensor([batch_length], dtype=torch.float, device=self.device))
-            intrinsic_reward = torch.clamp(intrinsic_reward, min=-50, max=50)
-        return intrinsic_reward
+            # intrinsic_reward = this_skill_log_probs.view(-1, 1) - summed_other_skill_log_probs +\
+            #                    torch.log(torch.tensor([4.], dtype=torch.float, device=self.device))
+            # intrinsic_reward = torch.clamp(intrinsic_reward, min=-50, max=50)
+            # intrinsic_reward2 = torch.log(torch.tensor([4 + 1.], dtype=torch.float, device=self.device)) -\
+            #                     torch.log(1 + torch.exp(torch.clamp(summed_other_skill_log_probs - this_skill_log_probs.view(1, -1), -50, 50)).sum(dim=0))
+
+            # intrinsic_reward = np.log(num_reps + 1) -\
+            #                    np.log(1 + np.exp(np.clip(logp_altz -
+            #                    logp.reshape(1, -1), -50, 50)).sum(axis=0))

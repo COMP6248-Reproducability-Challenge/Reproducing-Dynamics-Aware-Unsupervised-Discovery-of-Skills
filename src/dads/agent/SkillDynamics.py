@@ -41,12 +41,12 @@ class SkillDynamics(nn.Module):
         self.to(self.device)
 
     def forward(self, observation_and_skill):
-        #out = self.batchnorm0(observation_and_skill)
-        out = self.fc1(observation_and_skill)# out = self.fc1(out)
-        #out = self.batchnorm1(out)
+        out = self.batchnorm0(observation_and_skill)
+        out = self.fc1(out)
+        out = self.batchnorm1(out)
         out = funcs.relu(out)
         out = self.fc2(out)
-        #out = self.batchnorm2(out)
+        out = self.batchnorm2(out)
         out = funcs.relu(out)
         mu1 = self.expert1_mu(out)
         mu2 = self.expert2_mu(out)
@@ -68,11 +68,15 @@ class SkillDynamics(nn.Module):
 
         # rsample() uses reparameterisation trick, so that the gradients can flow backwards through the parameters
         # in contrast to sample() which blocks gradients (as it's a random sample)
-        next_state_distribution = MultivariateNormal(expert_mu, self.sigma)
+        # TODO: MultivariateNormal appears to have a memory leak, replacing as we're only using an identity matrix as
+        #  the variance anyway. This appears on an AMD Vega 56 and doesn't replicate on Google Colab.
+        # next_state_distribution = MultivariateNormal(expert_mu, self.sigma)
+        next_state_distribution = Independent(Normal(expert_mu, self.sigma[0, 0]), 1)
         if reparam:
             delta = next_state_distribution.rsample()
         else:
             delta = next_state_distribution.sample()
+
         next_state = state_and_skill[:, 0:self.env_shape] + delta
         return next_state, delta, next_state_distribution
 
@@ -82,10 +86,10 @@ class SkillDynamics(nn.Module):
         predicted_current_state, delta, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
         # We index after this difference as we only want delta of the state and not the space-skill concatenation
         actual_delta = (current_obs_and_skill - previous_obs_and_skill)[:, 0:self.env_shape]
-        columnwise_stds = torch.std(actual_delta, dim=0)
-        columnwise_stds[columnwise_stds == 0] = 1
-        actual_delta_scaled = ((actual_delta - torch.mean(actual_delta, dim=0)) / columnwise_stds)
-        loss = -1.0 * torch.mean(distribution.log_prob(actual_delta), dim=0)
+        # columnwise_stds = torch.std(actual_delta, dim=0)
+        # columnwise_stds[columnwise_stds == 0] = 1
+        # actual_delta_scaled = ((actual_delta - torch.mean(actual_delta, dim=0)) / columnwise_stds)
+        loss = -1. * torch.mean(distribution.log_prob(actual_delta))
         loss.backward()
         if verbose:
             print("Skill dynamics loss: ", loss.item())
