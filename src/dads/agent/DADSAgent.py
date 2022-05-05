@@ -52,11 +52,11 @@ class DADSAgent(SACAgent):
             skill_one_hot_encoder[i][skill_ints[i]] = 1.0
         return skill_one_hot_encoder
 
-    def play_games(self, num_games, verbose=False, display_gameplay=False, skill=None):
+    def play_games(self, num_games, verbose=False, display_gameplay=False, skill=None, train=True):
         for _ in range(num_games):
-            self._play_game(verbose, display_gameplay, skill)
+            self._play_game(verbose, display_gameplay, skill, train)
 
-    def _play_game(self, verbose, display_gameplay, skill=None):
+    def _play_game(self, verbose, display_gameplay, skill=None, train=True):
         self.total_games += 1
         print("total games: ", self.total_games)
         self.env.reset_env()
@@ -64,12 +64,13 @@ class DADSAgent(SACAgent):
         self._sample_skill(skill)  # Updates self.active_skill tensor to be a newly sampled one hot encoding
         memorized_batch_size = 0
         env_timesteps = 0
-        while not self.env.done or env_timesteps < 250:
+        while not self.env.done or (env_timesteps < 250 and train):
             env_timesteps +=1
             # Take the observation from the environment, format it, push it to GPU
             current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device, requires_grad=False).reshape((1, -1))
             current_obs_skill = torch.cat((current_obs, self.active_skill), 1)
             current_action = self.choose_action(current_obs_skill)
+            print(current_action)
             if display_gameplay:
                 self.env.env.render()
             self.env.take_action(current_action.squeeze().cpu().numpy())
@@ -84,7 +85,7 @@ class DADSAgent(SACAgent):
             self.memory.append("reward", reward)
             self.memory.append("done", done)
             memorized_batch_size += 1
-            if memorized_batch_size >= self.batch_size:
+            if memorized_batch_size >= self.batch_size and train:
                 self.train_models(verbose=verbose)
                 self.memory.wipe()
                 memorized_batch_size = 0
@@ -104,7 +105,7 @@ class DADSAgent(SACAgent):
         # out above):
         # TODO: the rewards, as far as I can tell, are always equal; we need to investigate
         rewards = self.calc_intrinsic_rewards(skills=skills, states=states, new_states=new_states)
-        for _ in range(128):  # The paper uses 32 gradient descent steps for the SAC agent to learn
+        for _ in range(128):
             next_actions, next_log_probs = self.actor.sample_normal(observation=new_states_and_skills, reparameterise=True)
             target_q1 = self.critic_target1.forward(observation=new_states_and_skills, action=next_actions)
             target_q2 = self.critic_target2.forward(observation=new_states_and_skills, action=next_actions)
@@ -150,20 +151,18 @@ class DADSAgent(SACAgent):
             # Need to get the probability of the current state given the previous state and skill
             states_and_skills = torch.cat((states, skills), 1)
             _, _, this_skill_distribution = self.skill_dynamics.sample_next_state(states_and_skills)
-            this_skill_probs = torch.exp(this_skill_distribution.log_prob(new_states - states))
+            this_skill_log_probs = this_skill_distribution.log_prob(new_states - states)
 
-            summed_other_skill_probs = torch.zeros(size=(batch_length, 1), dtype=torch.float, device=self.device)
+            summed_other_skill_log_probs = torch.zeros(size=(batch_length, 1), dtype=torch.float, device=self.device)
             for i in range(self.n_skills):
                 other_skill = self._create_skill_encoded([i])
                 states_and_other_skills = torch.cat((states, other_skill.repeat((batch_length, 1))), 1)
                 _, _, other_skill_distribution = self.skill_dynamics.sample_next_state(states_and_other_skills)
-                other_skill_probs = torch.exp(other_skill_distribution.log_prob(new_states - states))
-                summed_other_skill_probs += other_skill_probs.reshape(-1, 1)
+                other_skill_log_probs = other_skill_distribution.log_prob(new_states - states)
+                summed_other_skill_log_probs += other_skill_log_probs.reshape(-1, 1)
 
-            # Fix for dividing by zero - if the denominator is zero, the numerator has to be, so just set the denom to be 1 instead:
-            summed_other_skill_probs[summed_other_skill_probs == 0] = 1
-            intrinsic_reward = torch.log(this_skill_probs / summed_other_skill_probs.view(-1)) + torch.log(torch.tensor([batch_length], dtype=torch.float, device=self.device))
+
+            intrinsic_reward = this_skill_log_probs.view(-1, 1) - summed_other_skill_log_probs +\
+                               torch.log(torch.tensor([batch_length], dtype=torch.float, device=self.device))
             intrinsic_reward = torch.clamp(intrinsic_reward, min=-50, max=50)
-            del states_and_skills, states_and_other_skills, summed_other_skill_probs, this_skill_probs,\
-                this_skill_distribution,
         return intrinsic_reward

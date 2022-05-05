@@ -20,6 +20,7 @@ class SkillDynamics(nn.Module):
         self.num_hidden_neurons = num_hidden_neurons  # Paper uses same number across layers and networks
         self.learning_rate = learning_rate
         # The first layer takes the state input plus a one-hot encoding of which skill is active
+        self.batchnorm0 = nn.BatchNorm1d(num_features=self.input_shape)
         self.batchnorm1 = nn.BatchNorm1d(num_features=self.num_hidden_neurons)
         self.batchnorm2 = nn.BatchNorm1d(num_features=self.num_hidden_neurons)
         self.fc1 = nn.Linear(self.input_shape, self.num_hidden_neurons)
@@ -40,11 +41,12 @@ class SkillDynamics(nn.Module):
         self.to(self.device)
 
     def forward(self, observation_and_skill):
-        out = self.fc1(observation_and_skill)
-        out = self.batchnorm1(out)
+        #out = self.batchnorm0(observation_and_skill)
+        out = self.fc1(observation_and_skill)# out = self.fc1(out)
+        #out = self.batchnorm1(out)
         out = funcs.relu(out)
         out = self.fc2(out)
-        out = self.batchnorm2(out)
+        #out = self.batchnorm2(out)
         out = funcs.relu(out)
         mu1 = self.expert1_mu(out)
         mu2 = self.expert2_mu(out)
@@ -59,7 +61,6 @@ class SkillDynamics(nn.Module):
 
         # Here we take ith expert's prediction of the mean multiplied by the softmax value IF the ith softmax was
         # the maximum. The other mus are "added" but are zero because they are multiplied by False.
-        # TODO: check whether this allows the gradients to propogate backwards. It might not?
         expert_mu = (mu1.T * softmax_gate[:, 0]).T * (top_gate_ind == 0) + \
                        (mu2.T * softmax_gate[:, 1]).T * (top_gate_ind == 1) + \
                        (mu3.T * softmax_gate[:, 2]).T * (top_gate_ind == 2) + \
@@ -72,20 +73,19 @@ class SkillDynamics(nn.Module):
             delta = next_state_distribution.rsample()
         else:
             delta = next_state_distribution.sample()
-        # TODO: fix this to be general, as 0:2 only relates to the mountain car environment's dimension of 2
-        next_state = state_and_skill[:, 0:self.env_shape] + delta # next_state = state_and_skill[:, 0:2] + delta
+        next_state = state_and_skill[:, 0:self.env_shape] + delta
         return next_state, delta, next_state_distribution
 
     def train_model(self, previous_obs_and_skill, current_obs_and_skill, verbose=False):
         # Remember: The dynamics model predicts the delta from the current state to the next
         self.optimizer.zero_grad(set_to_none=True)
-        next_state, delta, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
-        # We index after this difference as we only want  delta of the state and not the space-skill concatenation
+        predicted_current_state, delta, distribution = self.sample_next_state(previous_obs_and_skill, reparam=True)
+        # We index after this difference as we only want delta of the state and not the space-skill concatenation
         actual_delta = (current_obs_and_skill - previous_obs_and_skill)[:, 0:self.env_shape]
         columnwise_stds = torch.std(actual_delta, dim=0)
         columnwise_stds[columnwise_stds == 0] = 1
         actual_delta_scaled = ((actual_delta - torch.mean(actual_delta, dim=0)) / columnwise_stds)
-        loss = -1.0 * torch.mean(distribution.log_prob(actual_delta_scaled))
+        loss = -1.0 * torch.mean(distribution.log_prob(actual_delta), dim=0)
         loss.backward()
         if verbose:
             print("Skill dynamics loss: ", loss.item())
