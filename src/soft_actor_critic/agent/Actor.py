@@ -67,6 +67,8 @@ class Actor(nn.Module):
 
         # The lob probabilities are used in the policy loss, as well as the entropy part of the q learning loss.
         log_probs = normal.log_prob(actions_base) - torch.log(1 - tanh_actions.pow(2) + self.reparam_noise)
+        # sum across the log probabilities as we have assumed that each action is an independent normal, so
+        # the sum of the log probs across the columns is the log probs of the 8-dimensional action
         log_probs = log_probs.sum(1, keepdim=True)
 
         return tanh_actions, log_probs
