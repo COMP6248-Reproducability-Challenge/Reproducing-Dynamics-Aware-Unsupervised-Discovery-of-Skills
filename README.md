@@ -12,3 +12,7 @@ A dockerfile is present for use on systems with AMD GPUs - such as the RX Vega 5
 ## MacOS M1 Installation Guidelines
 To install MuJoCo for M1 macOS systems, please view the following tutorial (Minforge has to be used as the Python environment instead of Anaconda/Miniconda).
 https://github.com/openai/mujoco-py/issues/682
+
+## Running on colab
+Copy and paste all files on the main branch into cells on collab, deleting the import lines of packages starting with "."
+Install MuJoCo using the following instuctions: https://colab.research.google.com/drive/1KGMZdRq6AemfcNscKjgpRzXqfhUtCf-V?usp=sharing
