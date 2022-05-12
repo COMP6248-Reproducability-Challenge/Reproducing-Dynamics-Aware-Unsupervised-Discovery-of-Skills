@@ -24,12 +24,7 @@ class SACAgent:
         self.polyak = polyak
         self.policy_train_delay_modulus = policy_train_delay_modulus
         self.updates = 0
-
-        # entropy temperature
         self.alpha = torch.tensor([alpha]).to(self.device)
-        # self.target_entropy = -torch.prod(torch.Tensor(env.action_space.shape)).item()
-        # self.log_alpha = torch.zeros(1, requires_grad=True)
-        # self.alpha_optim = optim.Adam([self.log_alpha], lr=self.learning_rate)
 
         self.actor = Actor(learning_rate=self.learning_rate, input_shape=self.input_shape, max_action=self.action_scale,
                            number_actions=self.output_shape, device=self.device, writer=self.writer,
@@ -152,7 +147,6 @@ class SACAgent:
                                                                                              self.winstreak,
                                                                                              self.total_wins))
             # Now store the experience for later use in training
-            # current_action = torch.tensor(current_action, dtype=torch.float).to(self.device)
             reward = torch.tensor([[self.env.reward]], dtype=torch.float).to(self.device)
             done = torch.tensor([[done]], dtype=torch.int).to(self.device)
             self.memory.append("observation", current_obs)
