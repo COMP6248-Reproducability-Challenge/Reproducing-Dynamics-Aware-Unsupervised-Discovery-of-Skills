@@ -1,18 +1,18 @@
 import torch
 import torch.nn.functional as funcs
-from .Actor import Actor
-from .Critic import Critic
-from .Memory import Memory
+from src.soft_actor_critic.agent.Actor import Actor
+from src.soft_actor_critic.agent.Critic import Critic
+from src.soft_actor_critic.agent.Memory import Memory
 
 
 class SACAgent:
-    def __init__(self, env, device, num_hidden_neurons=256, writer=None,
-                 learning_rate=0.0003, discount_rate=0.99, memory_length=1000000, batch_size=256, polyak=0.995,
-                 alpha=0.2, policy_train_delay_modulus=2):
+    def __init__(self, env, device, num_hidden_neurons=256, writer=None, learning_rate=3e-4, discount_rate=0.99,
+                 memory_length=1000000, batch_size=256, polyak=0.995, alpha=0.1, policy_train_delay_modulus=2,
+                 input_shape=None):
         self.device = device
         self.learning_rate = learning_rate
         self.env = env
-        self.input_shape = self.env.observation_space.shape[0]
+        self.input_shape = self.env.observation_space.shape[0] if input_shape is None else input_shape
         self.output_shape = self.env.action_space.shape[0]
         self.action_scale = torch.FloatTensor(
                 (self.env.action_space.high - self.env.action_space.low) / 2.).to(self.device)
@@ -24,12 +24,7 @@ class SACAgent:
         self.polyak = polyak
         self.policy_train_delay_modulus = policy_train_delay_modulus
         self.updates = 0
-
-        # entropy temperature
         self.alpha = torch.tensor([alpha]).to(self.device)
-        # self.target_entropy = -torch.prod(torch.Tensor(env.action_space.shape)).item()
-        # self.log_alpha = torch.zeros(1, requires_grad=True)
-        # self.alpha_optim = optim.Adam([self.log_alpha], lr=self.learning_rate)
 
         self.actor = Actor(learning_rate=self.learning_rate, input_shape=self.input_shape, max_action=self.action_scale,
                            number_actions=self.output_shape, device=self.device, writer=self.writer,
@@ -65,7 +60,7 @@ class SACAgent:
         return actions
 
     def rescale_action(self, action):
-        return action.item() * self.action_scale
+        return action * self.action_scale
 
     def train_models(self, verbose):
         if len(self.memory.observation) < self.batch_size:
@@ -126,14 +121,14 @@ class SACAgent:
         self.env.reset_env()
         total_reward = 0
         while not self.env.done:
-            current_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device)
+            current_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device).type(torch.float)
             current_action = self.choose_action(current_obs)
             if display_gameplay:
                 self.env.env.render()
 
-            self.env.take_action([current_action])
+            self.env.take_action(current_action.squeeze().cpu().numpy())
             total_reward += self.env.reward
-            next_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device)
+            next_obs = torch.tensor(self.env.observation).reshape((1, -1)).to(self.device).type(torch.float)
             done = self.env.done
 
             self.train_models(verbose=False)
@@ -152,7 +147,6 @@ class SACAgent:
                                                                                              self.winstreak,
                                                                                              self.total_wins))
             # Now store the experience for later use in training
-            current_action = torch.tensor([[current_action]], dtype=torch.float).to(self.device)
             reward = torch.tensor([[self.env.reward]], dtype=torch.float).to(self.device)
             done = torch.tensor([[done]], dtype=torch.int).to(self.device)
             self.memory.append("observation", current_obs)

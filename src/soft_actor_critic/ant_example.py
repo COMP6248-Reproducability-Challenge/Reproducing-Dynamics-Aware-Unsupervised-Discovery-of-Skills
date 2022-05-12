@@ -1,14 +1,14 @@
 import torch
 from agent.SACAgent import SACAgent
-from environments.pendulum import Pendulum
+from environments.ant import Ant
 
-env = Pendulum()
+env = Ant()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-agent = SACAgent(env=env, device=device)
+agent = SACAgent(env=env, device=device, learning_rate=0.01)
 
 t = 0
-while agent.winstreak < 10 and t < 150:
+while agent.winstreak < 10 and t < 250:
     t += 1
     agent.play_games(1, verbose=True)
 
