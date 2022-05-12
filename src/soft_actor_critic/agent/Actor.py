@@ -43,8 +43,7 @@ class Actor(nn.Module):
         log_sigma = self.log_sigma(out)
         # Clamping the variance of the sampling distribution makes the learning process more stable as it avoids
         # a covariance so large that the action we sample from the distribution is essentially a sample from a uniform
-        # distribution.
-        # TODO: Find reference for -20 and 2 as values - currently just taken from multiple github implementations.
+        # distribution. Common choices in other online implementations are -20 and 2:
         log_sigma_minimum = -20
         log_sigma_maximum = 2
         log_sigma = torch.clamp(log_sigma, min=log_sigma_minimum, max=log_sigma_maximum)

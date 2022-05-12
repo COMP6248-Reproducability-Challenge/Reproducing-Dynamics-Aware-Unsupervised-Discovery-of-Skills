@@ -66,7 +66,7 @@ class DADSAgent(SACAgent):
         memorized_batch_size = 0
         env_timesteps = 0
         while not self.env.done or (env_timesteps < 250 and train):
-            env_timesteps +=1
+            env_timesteps += 1
             # Take the observation from the environment, format it, push it to GPU
             current_obs = torch.tensor(self.env.observation, dtype=torch.float, device=self.device, requires_grad=False).reshape((1, -1))
             current_xy_coords = torch.tensor(self.env.xy_coords, dtype=torch.float, device=self.device, requires_grad=False).reshape(1, 2)
@@ -173,7 +173,7 @@ class DADSAgent(SACAgent):
             # intrinsic_reward = this_skill_log_probs.view(-1, 1) - summed_other_skill_log_probs +\
             #                    torch.log(torch.tensor([4.], dtype=torch.float, device=self.device))
 
-            # intrinsic_reward from their github implementation of the paper:
+            # intrinsic_reward from their TensorFlow implementation of the paper on GitHub:
             # intrinsic_reward = np.log(num_reps + 1) -\
             # np.log(1 + np.exp(np.clip(logp_altz - logp.reshape(1, -1), -50, 50)).sum(axis=0))
 
@@ -181,7 +181,7 @@ class DADSAgent(SACAgent):
             # intrinsic_reward = torch.log(torch.tensor([4.], dtype=torch.float, device=self.device)) +\
             #                     torch.clamp(this_skill_log_probs.view(-1, 1) - torch.log(summed_other_skill_probs), -50, 50)
 
-            # Copying their implementation of the rewards:
+            # Copying their implementation of the rewards but in PyTorch:
             intrinsic_reward = torch.log(torch.tensor([4.], dtype=torch.float, device=self.device)) -\
             torch.log(1 + torch.exp(torch.clamp(torch.log(summed_other_skill_probs) - this_skill_log_probs.view(-1, 1), -50, 50)))
             return intrinsic_reward
