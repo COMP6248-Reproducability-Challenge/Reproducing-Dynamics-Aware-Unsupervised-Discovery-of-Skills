@@ -7,3 +7,7 @@ A dockerfile is present for use on systems with AMD GPUs - such as the RX Vega 5
 * PyTorch
 * MuJoCo 2.1
 * Python (Miniconda or Anaconda is strongly suggested)
+
+## Running on colab
+Copy and paste all files on the main branch into cells on collab, deleting the import lines of packages starting with "."
+Install MuJoCo using the following instuctions: https://colab.research.google.com/drive/1KGMZdRq6AemfcNscKjgpRzXqfhUtCf-V?usp=sharing
