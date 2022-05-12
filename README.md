@@ -7,8 +7,7 @@ A dockerfile is present for use on systems with AMD GPUs - such as the RX Vega 5
 * PyTorch
 * Open AI Gym >= 0.23.1
 * MuJoCo >= 2.1.0
-* Python (Miniconda or Anaconda is strongly suggested)
+* Python (Miniconda/Anaconda/Miniforge is strongly suggested)
 
-To install MuJoCo for M1 macOS systems, please view the following tutorial:
+To install MuJoCo for M1 macOS systems, please view the following tutorial (Minforge has to be used as the Python environment instead of Anaconda/Miniconda).
 https://github.com/openai/mujoco-py/issues/682
-
