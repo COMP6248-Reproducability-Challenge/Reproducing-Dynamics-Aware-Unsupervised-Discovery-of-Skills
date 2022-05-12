@@ -15,3 +15,7 @@ To install MuJoCo for M1 macOS systems, please view the following tutorial (Minf
 https://github.com/openai/mujoco-py/issues/682
 
 Ensure that you can import mujoco_py, gym and torch  packages before attempting to run the code.
+
+## Running on colab
+Copy and paste all files on the main branch into cells on collab, deleting the import lines of packages starting with "."
+Install MuJoCo using the following instuctions: https://colab.research.google.com/drive/1KGMZdRq6AemfcNscKjgpRzXqfhUtCf-V?usp=sharing
